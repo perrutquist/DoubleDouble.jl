@@ -3,7 +3,7 @@ module DoubleDoubles
 export Double, Single, DoubleDouble, QuadDouble, OctaDouble
 import Base:
     convert,
-    *, +, -, /, sqrt, <, ldexp,
+    *, +, -, /, sqrt, <, >, <=, >=, ldexp,
     rem, abs, rand, promote_rule,
     show, big,
     precision
@@ -29,6 +29,11 @@ convert{T<:Number}(::Type{Zerotype}, x::T) = x==zero(T) ? Zerotype() : throw(Ine
 *(::Zerotype,::Number) = Zerotype()
 *(::Zerotype,::Zerotype) = Zerotype()
 /(::Zerotype,::Number) = Zerotype()
+<(::Zerotype,::Zerotype) = false
+>(::Zerotype,::Zerotype) = false
+>=(::Zerotype,::Zerotype) = true
+<=(::Zerotype,::Zerotype) = true
+
 
 abstract AbstractDouble{T} <: AbstractFloat
 
@@ -146,6 +151,7 @@ convert{T<:AbstractFloat}(::Type{Double{T}}, x::Rational) = convert(Double{T}, x
 
 ## promotion
 promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{Int64}) = Double{T}
+promote_rule{T<:AbstractFloat}(::Type{Single{T}}, ::Type{Int64}) = Double{T}
 
 promote_rule{T<:AbstractFloat}(::Type{Single{T}}, ::Type{T}) = Single{T}
 promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{T}) = Double{T}
@@ -179,10 +185,13 @@ typealias QuadDouble Quad{Float64}
 typealias Octa{T} Double{Quad{T}}
 typealias OctaDouble Octa{Float64}
 
-# <
+# Comparisons
 
-function <{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
-    x.hi < y.hi ? true : x.lo < y.lo
+for op in [:<,:>]
+  @eval $op{T}(x::AbstractDouble{T},y::AbstractDouble{T})=$op(x.hi,y.hi)?true:$op(x.lo,y.lo)
+end
+for op in [:<=,:>=]
+  @eval $op{T}(x::AbstractDouble{T},y::AbstractDouble{T})=$op(x.hi,y.hi)?$op(x.lo,y.lo):false
 end
 
 # TODO eliminate branches
@@ -198,7 +207,7 @@ function +{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
     normalize_double(r, s)
 end
 
--{T<:AbstractFloat}(x::Double{T}) = Double(-x.hi, -x.lo)
+-{T<:AbstractFloat}(x::AbstractDouble{T}) = Double(-x.hi, -x.lo)
 
 function -{T}(x::Single{T},y::Single{T})
     abs(x.hi) > abs(y.hi) ? normalize_double(x.hi, -y.hi) : normalize_double(-y.hi, x.hi)
