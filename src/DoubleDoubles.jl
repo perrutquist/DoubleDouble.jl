@@ -124,15 +124,15 @@ function convert{T<:AbstractFloat}(::Type{Single{T}}, x::Rational)
   Single(z)
 end
 
-convert{T1<:Union{Float64,Float32,Float16}, T2<:AbstractFloat}(::Type{T1}, x::Double{T2}) =
+convert{T1<:AbstractFloat, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
   convert(T1, x.hi) + (precision(T1) >= precision(T2) ? convert(T1, x.lo) : 0)
 
 function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Real)
-    z = convert(T, x)
-    Double(z, convert(T, x-z))
+  z = convert(T, x)
+  Double(z, convert(T, x-z))
 end
 
-function convert{T}(::Type{BigFloat}, x::AbstractDouble{T})
+function convert{T<:AbstractFloat}(::Type{BigFloat}, x::AbstractDouble{T})
   setprecision(BigFloat, 2*precision(T)) do
     convert(BigFloat, x.hi) + convert(BigFloat, x.lo)
   end
@@ -316,7 +316,7 @@ end
 
 function show{T}(io::IO, x::AbstractDouble{T})
   #println("double...")
-  println(io, convert(BigFloat,x))
+  print(io, convert(BigFloat,x))
 end
 
 end #module

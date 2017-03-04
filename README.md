@@ -36,7 +36,7 @@ julia> (xx.hi.hi, xx.hi.lo, xx.lo.hi, xx.lo.lo)
 ```
 
 The other type defined is `Single`, which is a `Double` where the `lo` field is guaranteed to be zero.
-(Attempting an conversion to `Single` will throw an `InexactError` if this is not the case.)
+(Attempting a conversion to `Single` will throw an `InexactError` if this is not the case.)
 Operations on `Single` typically return `Double` and will often be faster than the corresponding operations on `Double`.
 
 Examples
@@ -47,10 +47,13 @@ By exploiting this property, we can compute exact products of floating point num
 
 ```julia
 julia> u, v = 64 * rand(), 64 * rand()
-(15.59263373822506,39.07676672446341)
+(44.438125149181445, 46.96067529434315)
 
 julia> w = Single(u) * Single(v)
-Double{Float64}(609.3097112086186, -5.3107663829696295e-14)
+2.08684436582009398756273247966684e+03
+
+julia> (w.hi, w.lo)
+(2086.844365820094, -3.871317795744025e-14)
 ```
 Note that the product of two `Single`s is a `Double`: the `hi` element of this
 double is equal to the usual rounded product, and the `lo` element contains the exact
@@ -59,19 +62,19 @@ difference between the exact value and the rounded.
 This can be used to get an accurate remainder
 ```julia
 julia> r = rem(w, 1.0)
-Double{Float64}(0.309711208618584, 1.6507898617445858e-17)
+8.44365820093987562732479666836822e-01
 
 julia> Float64(r)
-0.309711208618584
+0.8443658200939875
 ```
 
 This is much more accurate than taking ordinary products, and gives the same answer as using `BigFloat`s:
 ```julia
 julia> rem(u*v, 1.0)
-0.3097112086186371
+0.8443658200940263
 
 julia> Float64(rem(big(u) * big(v), 1.0))
-0.309711208618584
+0.8443658200939875
 ```
 However, since the `DoubleDouble` version is carried out using ordinary floating-point operations, it is of the order of 1000x faster than the `BigFloat` version.
 
