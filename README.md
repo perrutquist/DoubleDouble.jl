@@ -1,9 +1,13 @@
 DoubleDoubles.jl
 ===============
 
-NOTE: This is work in progress. Use the more stable "DoubleDouble.jl" that this repository was forked from until the code has stabilized.
+(The module was renamed `DoubleDoubles` as it provides the type `DoubleDouble`.)
+This is work in progress. A lot of the code is completely untested.
 
-`DoubleDoubles.jl` is a Julia package for performing extended-precision arithmetic using pairs of floating-point numbers. This is commonly known as "double-double" arithmetic, as the most common format is a pair of C-doubles (`Float64` in Julia), although `DoubleDoubles.jl` will actually work for any floating-point type, including itself. Its aim is to provide accurate results without the overhead of `BigFloat` types.
+NOTE: Constructs like `Double(pi)` that used to default to `Double{Float64}(pi)` no longer work.
+Either write out `Double{Float64}` explicitly, or use the type alias `DoubleDouble`.
+
+`DoubleDoubles.jl` is a Julia package for performing extended-precision arithmetic using pairs of floating-point numbers. This is commonly known as "double-double" arithmetic, as the most common format is a pair of C-doubles (`Float64` in Julia), although `Double`s will actually work for any floating-point type, including itself. Its aim is to provide accurate results without the overhead of `BigFloat` types.
 
 The core routines are based on the ideas and algorithms of [Dekker (1971)][dekker1971].
 
@@ -14,7 +18,7 @@ The main type is `Double`, with two floating-point fields: `hi`, storing the lea
 ```julia
 julia> using DoubleDoubles
 
-julia> x = Double{Float64}(pi)
+julia> x = DoubleDouble(pi)
 3.14159265358979323846264338327953
 
 julia> (x.hi, x.lo)
@@ -23,7 +27,7 @@ julia> (x.hi, x.lo)
 julia> eps(x.hi)
 4.440892098500626e-16
 
-julia> xx = Double{Double{Float64}}(pi)
+julia> xx = QuadDouble(pi)
 3.1415926535897932384626433832795028841971693993751058209749445924
 
 julia> (xx.hi.hi, xx.hi.lo, xx.lo.hi, xx.lo.lo)
@@ -31,7 +35,7 @@ julia> (xx.hi.hi, xx.hi.lo, xx.lo.hi, xx.lo.lo)
 ```
 
 The other type defined is `Single`, which is a `Double` where the `lo` field is guaranteed to be zero.
-(Attempting an conversion to `Single` will result in InexactError if this is not the case.)
+(Attempting an conversion to `Single` will throw an `InexactError` if this is not the case.)
 Operations on `Single` typically return `Double` and will often be faster than the corresponding operations on `Double`.
 
 Examples

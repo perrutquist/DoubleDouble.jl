@@ -114,7 +114,13 @@ convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double{T}) = x # needed because 
 
 function convert{T<:AbstractFloat}(::Type{Single{T}}, x::Real)
   z = convert(T,x)
-  z == x || throw(IntexactError())
+  z == x || throw(InexactError())
+  Single(z)
+end
+
+function convert{T<:AbstractFloat}(::Type{Single{T}}, x::Rational)
+  z = convert(T,x)
+  z == x || throw(InexactError())
   Single(z)
 end
 
@@ -244,7 +250,7 @@ function sqrt{T}(x::AbstractDouble{T})
     Double(c, cc)
 end
 
-rem{T}(x::Double{T},d::Real) = Double(rem(x.hi,d), rem(x.lo,d))
+rem{T}(x::Double{T},d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
 abs{T}(x::Double{T}) = x.hi>0?x:-x
 
 "The minimum positive difference between possible rand() return values"
@@ -260,7 +266,7 @@ A quick random number function, that does not fill all the bits of the
 significand. (The spacing between possible random numbers is constant eps(2))
 """
 function rand{T}(::Type{Double{T}})
-    Double(rand(T), rand_eps(T)*rand(T))
+    normalize_double(rand(T), rand_eps(T)*rand(T))
 end
 
 """
