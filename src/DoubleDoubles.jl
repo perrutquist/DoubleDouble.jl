@@ -206,7 +206,7 @@ end
 function -{T}(x::Double{T}, y::Double{T})
     r = x.hi - y.hi
     s = abs(x.hi) > abs(y.hi) ? (((x.hi - r) - y.hi) - y.lo) + x.lo : (((-y.hi - r) + x.hi) + x.lo) - y.lo
-    Double(r, s)
+    normalize(r, s)
 end
 
 # TODO FMA version

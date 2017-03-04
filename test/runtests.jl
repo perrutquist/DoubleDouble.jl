@@ -45,5 +45,21 @@ bxy = bx*by
 a = Double{Float64}(big"3.1")
 @test a == Double{Float64}(3.1, -8.881784197001253e-17)
 
+<<<<<<< HEAD
 @test Double{Float64}(3) == Double(3.0, 0.0)
 @test Double{Float64}(big(3)) == Double(3.0, 0.0)
+=======
+@test Single(3) === Single(3.0)
+@test Double(3) === Double(3.0, 0.0)
+@test Double(big(3)) === Double(3.0, 0.0)
+
+@test convert(Single{Float64}, 1) === Single(1.0)
+@test convert(Single{Float32}, 1) === Single(1.0f0)
+@test convert(Double{Float64}, 1) === Double(1.0, 0.0)
+@test convert(Double{Float32}, 1) === Double(1.0f0, 0.0f0)
+
+@test Single{Float32}(3) === Single{Float32}(3.0f0)
+@test Double{Float32}(3) === Double{Float32}(3.0f0, 0.0f0)
+@test Single{Float32}(BigFloat(3)) === Single{Float32}(3.0f0)
+@test Double{Float32}(BigFloat(3)) === Double{Float32}(3.0f0, 0.0f0)
+>>>>>>> master
