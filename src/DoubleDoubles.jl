@@ -1,6 +1,6 @@
 module DoubleDoubles
 
-export Double, Single
+export Double, Single, DoubleDouble, QuadDouble, OctaDouble
 import Base:
     convert,
     *, +, -, /, sqrt, <, ldexp,
@@ -45,7 +45,7 @@ end
 
 # "Normalise" Doubles to ensure abs(lo) <= 0.5eps(hi)
 # assumes abs(u) > abs(v): if not, use Single + Single
-function normalize{T}(u::T, v::T)
+function normalize_double{T}(u::T, v::T)
     w = u + v
     Double(w, (u-w) + v)
 end
@@ -112,7 +112,11 @@ convert{T<:AbstractFloat}(::Type{T}, x::AbstractDouble{T}) = x.hi
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Single{T}) = x # needed because Single <: AbstractFloat
 convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double{T}) = x # needed because Double <: AbstractFloat
 
-convert{T<:AbstractFloat}(::Type{Single{T}}, x::AbstractFloat) = Single(convert(T,x))
+function convert{T<:AbstractFloat}(::Type{Single{T}}, x::Real)
+  z = convert(T,x)
+  z == x || throw(IntexactError())
+  Single(z)
+end
 
 convert{T1<:Union{Float64,Float32,Float16}, T2<:AbstractFloat}(::Type{T1}, x::Double{T2}) =
   convert(T1, x.hi) + (precision(T1) >= precision(T2) ? convert(T1, x.lo) : 0)
@@ -127,6 +131,8 @@ function convert{T}(::Type{BigFloat}, x::AbstractDouble{T})
     convert(BigFloat, x.hi) + convert(BigFloat, x.lo)
   end
 end
+
+convert{T<:AbstractFloat}(::Type{Double{T}}, x::Rational) = convert(Double{T}, x.num)/convert(Double{T}, x.den)
 
 ## promotion
 promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{Int64}) = Double{T}
@@ -147,7 +153,6 @@ promote_rule{T<:AbstractFloat}(::Type{AbstractDouble{T}}, ::Type{BigFloat}) = Bi
 # Use Double(x, zero(x)) if Single(x) cannot be used.
 
 Double{T}(::Type{T}, x::Real) = convert(Double{T}, x)
-Double{T}(::Type{T}, x::Rational) = convert(Double{T}, x.num)/convert(Double{T}, x.den)
 
 # Macro will do the BigFloat conversion at compile-time.
 @generated function doublesym{T<:AbstractFloat,sym}(::Type{Double{T}}, ::Irrational{sym})
@@ -166,33 +171,28 @@ typealias OctaDouble Octa{Float64}
 
 # <
 
-hi(x::Double) = x.hi
-hi(x::Single) = x.hi
-lo(x::Double) = x.lo
-lo{T}(x::Single{T}) = Zerotype()
-
 function <{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
-    hi(x) < hi(y) ? true : lo(x) < lo(y)
+    x.hi < y.hi ? true : x.lo < y.lo
 end
 
 # TODO eliminate branches
 # add12
 function +{T}(x::Single{T},y::Single{T})
-    abs(x.hi) > abs(y.hi) ? normalize(x.hi, y.hi) : normalize(y.hi, x.hi)
+    abs(x.hi) > abs(y.hi) ? normalize_double(x.hi, y.hi) : normalize_double(y.hi, x.hi)
 end
 
 # Dekker add2
 function +{T}(x::Double{T}, y::Double{T})
     r = x.hi + y.hi
     s = abs(x.hi) > abs(y.hi) ? (((x.hi - r) + y.hi) + y.lo) + x.lo : (((y.hi - r) + x.hi) + x.lo) + y.lo
-    normalize(r, s)
+    normalize_double(r, s)
 end
 
 # add122
 function +{T}(x::Single{T}, y::Double{T})
     r = x.hi + y.hi
     s = abs(x.hi) > abs(y.hi) ? ((x.hi - r) + y.hi) + y.lo : ((y.hi - r) + x.hi) + y.lo
-    normalize(r, s)
+    normalize_double(r, s)
 end
 +{T}(x::Double{T}, y::Single{T}) = y + x
 
@@ -200,47 +200,47 @@ end
 
 # TODO - All of + methods for -
 function -{T}(x::Single{T},y::Single{T})
-    abs(x.hi) > abs(y.hi) ? normalize(x.hi, -y.hi) : normalize(-y.hi, x.hi)
+    abs(x.hi) > abs(y.hi) ? normalize_double(x.hi, -y.hi) : normalize_double(-y.hi, x.hi)
 end
 
 function -{T}(x::Double{T}, y::Double{T})
     r = x.hi - y.hi
     s = abs(x.hi) > abs(y.hi) ? (((x.hi - r) - y.hi) - y.lo) + x.lo : (((-y.hi - r) + x.hi) + x.lo) - y.lo
-    normalize(r, s)
+    normalize_double(r, s)
 end
 
 # TODO FMA version
 # Dekker mul12
 function *{T}(x::Single{T},y::Single{T})
-    hx,lx = splitprec(hi(x))
-    hy,ly = splitprec(hi(y))
-    z = hi(x)*hi(y)
-    normalize(z, ((hx*hy-z) + hx*ly + lx*hy) + lx*ly)
+    hx,lx = splitprec(x.hi)
+    hy,ly = splitprec(y.hi)
+    z = x.hi*y.hi
+    normalize_double(z, ((hx*hy-z) + hx*ly + lx*hy) + lx*ly)
 end
 
 # Dekker mul2
 function *{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
-    c = Single(hi(x)) * Single(hi(y))
-    cc = (hi(x) * lo(y) + lo(x) * hi(y)) + lo(c)
-    normalize(c.hi, cc)
+    c = Single(x.hi) * Single(y.hi)
+    cc = (x.hi * y.lo + x.lo * y.hi) + c.lo
+    normalize_double(c.hi, cc)
 end
 
 # Dekker div2
-function /{T}(x::Double{T}, y::Double{T})
-    c = hi(x) / hi(y)
-    u = Single(c) * Single(hi(y))
-    cc = ((((hi(x) - hi(u)) - lo(u)) + lo(x)) - c*lo(y))/hi(y)
-    normalize(c, cc)
+function /{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
+    c = x.hi / y.hi
+    u = Single(c) * Single(y.hi)
+    cc = ((((x.hi - u.hi) - u.lo) + x.lo) - c*y.lo)/y.hi
+    normalize_double(c, cc)
 end
 
 # Dekker sqrt2
 function sqrt{T}(x::AbstractDouble{T})
-    if hi(x) <= 0
+    if x.hi <= 0
         throw(DomainError("sqrt will only return a complex result if called with a complex argument."))
     end
-    c = sqrt(hi(x))
+    c = sqrt(x.hi)
     u = Single(c)*Single(c)
-    cc = (((hi(x) - hi(u)) - lo(u)) + lo(x))*convert(T,0.5)/c
+    cc = (((x.hi - u.hi) - u.lo) + x.lo)*convert(T,0.5)/c
     Double(c, cc)
 end
 
