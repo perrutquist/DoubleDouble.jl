@@ -2,9 +2,10 @@ DoubleDoubles.jl
 ===============
 
 (The module was renamed `DoubleDoubles` as it provides the type `DoubleDouble`.)
-This is work in progress. A lot of the code is completely untested.
 
-NOTE: Constructs like `Double(pi)` that used to default to `Double{Float64}(pi)` no longer work.
+This is work in progress. Don't switch from DoubleDouble.jl just yet. A lot of the code is completely untested.
+
+NOTE: Constructs like `Double(pi)` that used to default to `Double{Float64}(pi)` will no longer work.
 Either write out `Double{Float64}` explicitly, or use the type alias `DoubleDouble`.
 
 `DoubleDoubles.jl` is a Julia package for performing extended-precision arithmetic using pairs of floating-point numbers. This is commonly known as "double-double" arithmetic, as the most common format is a pair of C-doubles (`Float64` in Julia), although `Double`s will actually work for any floating-point type, including itself. Its aim is to provide accurate results without the overhead of `BigFloat` types.
