@@ -106,7 +106,7 @@ convert{T<:AbstractFloat}(::Type{Double{T}}, x::T) = Double(x, zero(T))
 
 convert{T<:AbstractFloat}(::Type{Double{T}}, x::Single{T}) = Double(x.hi, zero(T))
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Double{T}) = x.lo == zero(T) ? Single(x.hi) : throw(InexactError())
-?
+
 convert{T<:AbstractFloat}(::Type{T}, x::AbstractDouble{T}) = x.hi
 
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Single{T}) = x # needed because Single <: AbstractFloat

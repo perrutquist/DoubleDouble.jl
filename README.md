@@ -1,7 +1,9 @@
-DoubleDouble.jl
+DoubleDoubles.jl
 ===============
 
-`DoubleDouble.jl` is a Julia package for performing extended-precision arithmetic using pairs of floating-point numbers. This is commonly known as "double-double" arithmetic, as the most common format is a pair of C-doubles (`Float64` in Julia), although `DoubleDouble.jl` will actually work for any floating-point type. Its aim is to provide accurate results without the overhead of `BigFloat` types.
+NOTE: This is work in progress. Use the more stable "DoubleDouble.jl" that this repository was forked from until the code has stabilized.
+
+`DoubleDoubles.jl` is a Julia package for performing extended-precision arithmetic using pairs of floating-point numbers. This is commonly known as "double-double" arithmetic, as the most common format is a pair of C-doubles (`Float64` in Julia), although `DoubleDoubles.jl` will actually work for any floating-point type, including itself. Its aim is to provide accurate results without the overhead of `BigFloat` types.
 
 The core routines are based on the ideas and algorithms of [Dekker (1971)][dekker1971].
 
@@ -10,17 +12,27 @@ Interface
 The main type is `Double`, with two floating-point fields: `hi`, storing the leading bits, and `lo` storing the remainder. `hi` is stored to full precision and rounded to nearest; hence, for any `Double` `x`, we have `abs(x.lo) <= 0.5 * eps(x.hi)`. Although these types can be created directly, the usual interface is the `Double` function:
 
 ```julia
-julia> using DoubleDouble
+julia> using DoubleDoubles
 
-julia> x = Double(pi)
-Double{Float64}(3.141592653589793,1.2246467991473532e-16)
+julia> x = Double{Float64}(pi)
+3.14159265358979323846264338327953
+
+julia> (x.hi, x.lo)
+(3.141592653589793,1.2246467991473532e-16)
 
 julia> eps(x.hi)
 4.440892098500626e-16
+
+julia> xx = Double{Double{Float64}}(pi)
+3.1415926535897932384626433832795028841971693993751058209749445924
+
+julia> (xx.hi.hi, xx.hi.lo, xx.lo.hi, xx.lo.lo)
+(3.141592653589793,1.2246467991473532e-16,-2.764667309787496e-32,1.4797009536535408e-48)
 ```
 
-The other type defined is `Single`, which is simply a wrapper for a
-floating-point type, but whose results will be promoted to `Double`.
+The other type defined is `Single`, which is a `Double` where the `lo` field is guaranteed to be zero.
+(Attempting an conversion to `Single` will result in InexactError if this is not the case.)
+Operations on `Single` typically return `Double` and will often be faster than the corresponding operations on `Double`.
 
 Examples
 ---------
