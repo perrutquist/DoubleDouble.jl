@@ -13,7 +13,8 @@ The core routines are based on the ideas and algorithms of [Dekker (1971)][dekke
 
 Interface
 ---------
-The main type is `Double`, with two floating-point fields: `hi`, storing the leading bits, and `lo` storing the remainder. `hi` is stored to full precision and rounded to nearest; hence, for any `Double` `x`, we have `abs(x.lo) <= 0.5 * eps(x.hi)`. Although these types can be created directly, the usual interface is the `Double` function:
+The main type is `Double`, with two floating-point fields: `hi`, storing the leading bits, and `lo` storing the remainder. `hi` is stored to full precision and rounded to nearest.  When creating a `Double` directly using the type constructor, the user is responsible for ensuring that `abs(x.lo) <= 0.5 * eps(x.hi)`.
+However, `Double`s are typically created by conversion from other numeric types.
 
 ```julia
 julia> using DoubleDoubles
