@@ -10,7 +10,7 @@ import Base:
 
 "A type that stores no data, and holds the value zero."
 # We create this type just so that Single can have a .lo field.
-immutable Zerotype <: Number
+immutable Zerotype <: AbstractFloat
 end
 promote_rule{T<:Number}(::Type{Zerotype}, ::Type{T}) = T
 convert(::Type{Zerotype}, ::Zerotype) = Zerotype()
@@ -18,12 +18,16 @@ convert{T<:Number}(::Type{T}, ::Zerotype) = zero(T)
 convert{T<:Number}(::Type{Zerotype}, x::T) = x==zero(T) ? Zerotype() : throw(InexactError)
 +(x::Number,::Zerotype) = x
 +(::Zerotype,x::Number) = x
++(x::Number,::Zerotype) = x
++(::Zerotype,::Zerotype) = Zerotype()
 -(x::Number,::Zerotype) = x
 -(::Zerotype,x::Number) = -x
+-(::Zerotype,::Zerotype) = Zerotype()
 -(::Zerotype) = Zerotype()
 # (These rules do not handle Inf and NaN according to the IEEE spec.)
 *(::Number,::Zerotype) = Zerotype()
 *(::Zerotype,::Number) = Zerotype()
+*(::Zerotype,::Zerotype) = Zerotype()
 /(::Zerotype,::Number) = Zerotype()
 
 abstract AbstractDouble{T} <: AbstractFloat
@@ -43,6 +47,9 @@ immutable Double{T<:AbstractFloat} <: AbstractDouble{T}
     lo::T
 end
 
+# A Double with a Zerotype as lo is the definition of a Single.
+Double(hi::AbstractFloat, ::Zerotype) = Single(hi)
+
 # "Normalise" Doubles to ensure abs(lo) <= 0.5eps(hi)
 # assumes abs(u) > abs(v): if not, use Single + Single
 function normalize_double{T}(u::T, v::T)
@@ -56,8 +63,8 @@ end
 precision{T}(::Type{Double{T}}) = 2*precision(T)
 
 # The precision of Single is defined the same as the precision of the
-# correspoinding Double. The "extra" precision is implied by the fact
-# that we only use Single when the lower part is exactly zero.
+# correspoinding Double. The digits "stored" in the always-zero .lo
+# field count! (This is why Single contructors may throw InexactError.)
 precision{T}(::Type{Single{T}}) = 2*precision(T)
 
 # ldexp can be done without renormalization
@@ -71,9 +78,9 @@ May give incorrect results if poweroftwo is not a power of two.
 For x::Double, this is faster than normal multiplication because no
 renormalization is needed.
 """
-ldmul(x::AbstractFloat, poweroftwo::Real) = x*convert(typeof(x), poweroftwo)
-function ldmul(x::Double, poweroftwo::Real)
-  Double(ldmul(x.hi,poweroftwo),ldmul(x.lo.poweroftwo))
+ldmul(x::AbstractFloat, poweroftwo::Real) = convert(typeof(x), x*poweroftwo)
+function ldmul(x::AbstractDouble, poweroftwo::Real)
+  Double(ldmul(x.hi,poweroftwo),ldmul(x.lo,poweroftwo))
 end
 
 """
@@ -95,9 +102,6 @@ end
 function splitprec(x::Double)
     Single(x.lo), Single(x.hi)
 end
-
-# ones(T::Double, dims...) = fill!(Array(T, dims...), (one)(T))
-# zeros(T::Double, dims...) = fill!(Array(T, dims...), (zero)(T))
 
 ## conversion
 
@@ -188,28 +192,19 @@ function +{T}(x::Single{T},y::Single{T})
 end
 
 # Dekker add2
-function +{T}(x::Double{T}, y::Double{T})
+function +{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
     r = x.hi + y.hi
     s = abs(x.hi) > abs(y.hi) ? (((x.hi - r) + y.hi) + y.lo) + x.lo : (((y.hi - r) + x.hi) + x.lo) + y.lo
     normalize_double(r, s)
 end
 
-# add122
-function +{T}(x::Single{T}, y::Double{T})
-    r = x.hi + y.hi
-    s = abs(x.hi) > abs(y.hi) ? ((x.hi - r) + y.hi) + y.lo : ((y.hi - r) + x.hi) + y.lo
-    normalize_double(r, s)
-end
-+{T}(x::Double{T}, y::Single{T}) = y + x
-
 -{T<:AbstractFloat}(x::Double{T}) = Double(-x.hi, -x.lo)
 
-# TODO - All of + methods for -
 function -{T}(x::Single{T},y::Single{T})
     abs(x.hi) > abs(y.hi) ? normalize_double(x.hi, -y.hi) : normalize_double(-y.hi, x.hi)
 end
 
-function -{T}(x::Double{T}, y::Double{T})
+function -{T}(x::AbstractDouble{T}, y::AbstractDouble{T})
     r = x.hi - y.hi
     s = abs(x.hi) > abs(y.hi) ? (((x.hi - r) - y.hi) - y.lo) + x.lo : (((-y.hi - r) + x.hi) + x.lo) - y.lo
     normalize_double(r, s)
