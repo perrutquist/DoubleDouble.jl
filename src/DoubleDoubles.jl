@@ -242,7 +242,6 @@ highfloat(x::AbstractFloat) = x
 highfloat(x::AbstractDouble) = highfloat(x.hi)
 
 rem(x::AbstractDouble,d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
-sign(x::AbstractDouble) = sign(x.hi)
 signbit(x::AbstractDouble) = signbit(x.hi)
 for op in [:copysign, :flipsign]
   @eval $op(x::AbstractFloat,y::AbstractDouble) = $op(x,highfloat(y))
@@ -257,6 +256,6 @@ function show{T}(io::IO, x::AbstractDouble{T})
 end
 
 # Not defined in this module, but should work anyway:
-# zero, zeros, one, ones, abs, ...
+# zero, zeros, one, ones, abs, sign...
 
 end #module
