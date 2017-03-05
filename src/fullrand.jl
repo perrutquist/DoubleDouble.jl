@@ -11,6 +11,7 @@ If rand() is used in testing arithmetic operations, then trailing zeros
 in the significand might mask potential problems. With fullrand, this
 problem is avoided.
 """
+
 function fullrand(::Type{Float64})
   rnd = rand(UInt64)
   lz = leading_zeros(rnd)
@@ -26,7 +27,6 @@ end
 
 fullrand(::Type{Float32}) = Float32(fullrand(Float64))
 fullrand(::Type{Float16}) = Float16(fullrand(Float64))
-fullrand{T<:Integer}(::Type{T}) = rand(T)
 
 function fullrand{T}(::Type{Double{T}})
   hi = fullrand(T);
@@ -49,3 +49,32 @@ function fullrand(::Type{BigFloat})
   end
   return r
 end
+
+"fullrand() for integer types is an alias for rand()"
+fullrand{T<:Integer}(::Type{T}) = rand(T)
+
+# fullrand for BigInt is a misnomer. BigInt has infinite precision,
+# but obviously we cannot generate an infinite number of random bits.
+# The goal here is to generate something that is useful for testing.
+"""
+fullrand(BigInt) generates some very large integers, but that will still not
+cause overflow in a Float64.
+"""
+function fullrand(::Type{BigInt})
+  r = BigInt(0)
+  for i=1:8
+    r = r<<64+rand(Int64)
+  end
+  return r
+end
+
+"fullrand(T,dims) returns an array of fullrand numbers of type T"
+function fullrand(T::Type, dims::Dims)
+  R = Array{T}(dims)
+  for i in eachindex(R)
+    R[i] = fullrand(T)
+  end
+  return R
+end
+
+fullrand(T::Type, d1::Integer, dims::Integer...) = fullrand(T, tuple(Int(d1), convert(Dims, dims)...))

@@ -58,3 +58,15 @@ a = Double{Float64}(big"3.1")
 @test Double{Float32}(3) === Double{Float32}(3.0f0, 0.0f0)
 @test Single{Float32}(BigFloat(3)) === Single{Float32}(3.0f0)
 @test Double{Float32}(BigFloat(3)) === Double{Float32}(3.0f0, 0.0f0)
+
+
+## Test type interactions
+
+intlist = [Int16, Int32, Int64, Int128, UInt16, UInt32, UInt64, UInt128, BigInt]
+floatlist = [Float16, Float32, Float64, BigFloat]
+doublelist = Array(DataType,1)
+for T = floatlist
+  for D = [Single{T}, Single{Single{T}}, Single{Single{Single{T}}}, Single{Double{T}}, Single{Single{Double{T}}}, Single{Double{Double{T}}}, Double{T}, Double{Double{T}}, Double{Double{Double{T}}}]
+    push!(doublelist, D)
+  end
+end
