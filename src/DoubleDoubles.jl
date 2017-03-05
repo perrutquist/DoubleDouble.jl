@@ -4,7 +4,7 @@ export Double, Single, DoubleDouble, QuadDouble, OctaDouble
 import Base:
     convert,
     *, +, -, /, sqrt, <, >, <=, >=, ldexp,
-    rem, rand, promote_rule, copysign, flipsign,
+    rem, rand, promote_rule, copysign, flipsign, abs,
     show, big,
     precision
 
@@ -243,11 +243,14 @@ highfloat(x::AbstractDouble) = highfloat(x.hi)
 
 rem(x::AbstractDouble,d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
 signbit(x::AbstractDouble) = signbit(x.hi)
+
+# TODO: Test if the below is really better than the default impelentation
 for op in [:copysign, :flipsign]
   @eval $op(x::AbstractFloat,y::AbstractDouble) = $op(x,highfloat(y))
   @eval $op(x::AbstractDouble,y::AbstractFloat) = Double($op(x.hi,y), $op(x.lo,y))
   @eval $op(x::AbstractDouble,y::AbstractDouble) = Double($op(x.hi,highfloat(y)), $op(x.lo,highfloat(y)))
 end
+abs(x::AbstractDouble) = flipsign(x,x)
 
 include("random.jl")
 
@@ -256,6 +259,6 @@ function show{T}(io::IO, x::AbstractDouble{T})
 end
 
 # Not defined in this module, but should work anyway:
-# zero, zeros, one, ones, abs, sign...
+# zero, zeros, one, ones, sign...
 
 end #module
