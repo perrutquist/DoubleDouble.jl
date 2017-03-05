@@ -1,4 +1,4 @@
-using DoubleDouble
+using DoubleDoubles
 
 n = 1_000_000
 X = 64*rand(n)
@@ -8,14 +8,16 @@ Zbig = Array(Float64,n)
 Zdouble = Array(Float64,n)
 
 function bigrem!(X,Y,Z)
-    for i = 1:length(Z)
-        Z[i] = float64(rem(big(X[i])*big(Y[i]),1.0))
+    setprecision(BigFloat, precision(DoubleDouble)) do
+      for i = 1:length(Z)
+        Z[i] = Float64(rem(big(X[i])*big(Y[i]),1.0))
+      end
     end
 end
 
 function doublerem!(X,Y,Z)
     for i = 1:length(Z)
-        Z[i] = float64(rem(Single(X[i])*Single(Y[i]),1.0))
+        Z[i] = Float64(rem(Single(X[i])*Single(Y[i]),1.0))
     end
 end
 
