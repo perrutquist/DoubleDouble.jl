@@ -49,6 +49,8 @@ function fullrand{T}(::Type{Double{T}})
   return Double(hi,eps(hi)*(lo-0.5))
 end
 
+fullrand(::Type{Single}) = throw(InexactError())
+
 function fullrand(::Type{BigFloat})
   x = fullrand(Float64)
   e = exponent(x)

@@ -4,7 +4,7 @@ export Double, Single, DoubleDouble, QuadDouble, OctaDouble
 import Base:
     convert,
     *, +, -, /, sqrt, <, >, <=, >=, ldexp,
-    rem, abs, rand, promote_rule,
+    rem, rand, promote_rule, copysign, flipsign,
     show, big,
     precision
 
@@ -88,74 +88,74 @@ function splitprec(x::Double)
     Single(x.lo), Single(x.hi)
 end
 
-## conversion
-
+## Conversion to Single
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::T) = Single(x)
-convert{T<:AbstractFloat}(::Type{Double{T}}, x::T) = Double(x, zero(T))
-
-convert{T<:AbstractFloat}(::Type{Double{T}}, x::Single{T}) = Double(x.hi, zero(T))
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Double{T}) = x.lo == zero(T) ? Single(x.hi) : throw(InexactError())
-
-convert{T<:AbstractFloat}(::Type{T}, x::AbstractDouble{T}) = x.hi
-
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Single{T}) = x # needed because Single <: AbstractFloat
+
+function singleconvert{T<:AbstractFloat}(::Type{T}, x::Real)
+  z = convert(T,x)
+  z == x || throw(InexactError())
+  Single(z)
+end
+convert{T<:AbstractFloat}(::Type{Single{T}}, x::Real) = singleconvert(T, x)
+# Avoid ambiguity with Rational-to-AbstractFloat conversion in rational.jl
+convert{T<:AbstractFloat}(::Type{Single{T}}, x::Rational) = singleconvert(T, x)
+
+## Conversion to Double
+convert{T<:AbstractFloat}(::Type{Double{T}}, x::T) = Double(x, zero(T))
+convert{T<:AbstractFloat}(::Type{Double{T}}, x::Single{T}) = Double(x.hi, zero(T))
+convert{T<:AbstractFloat}(::Type{Double{T}}, x::Rational) = Double{T}(x.num)/Double{T}(x.den)
 convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double{T}) = x # needed because Double <: AbstractFloat
-
-function convert{T<:AbstractFloat}(::Type{Single{T}}, x::Real)
-  z = convert(T,x)
-  z == x || throw(InexactError())
-  Single(z)
-end
-
-function convert{T<:AbstractFloat}(::Type{Single{T}}, x::Rational)
-  z = convert(T,x)
-  z == x || throw(InexactError())
-  Single(z)
-end
-
-convert{T1<:AbstractFloat, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
-  convert(T1, x.hi) + (precision(T1) >= precision(T2) ? convert(T1, x.lo) : 0)
-
 function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Real)
   z = convert(T, x)
   Double(z, convert(T, x-z))
 end
-
 function convert{T<:AbstractFloat}(::Type{BigFloat}, x::AbstractDouble{T})
   setprecision(BigFloat, 2*precision(T)) do
     convert(BigFloat, x.hi) + convert(BigFloat, x.lo)
   end
 end
 
-convert{T<:AbstractFloat}(::Type{Double{T}}, x::Rational) = convert(Double{T}, x.num)/convert(Double{T}, x.den)
+# Macro will do the BigFloat generation of irrationals at compile-time.
+@generated function doublesym{T<:AbstractFloat,sym}(::Type{Double{T}}, ::Irrational{sym})
+  Double{T}(setprecision(()->BigFloat(eval(sym)),BigFloat,2*precision(T)+32))
+end
+convert{T<:AbstractFloat}(::Type{Double{T}}, sym::Irrational) = doublesym(Double{T}, sym)
+
+## Conversion from Single/Double
+convert{T<:AbstractFloat}(::Type{T}, x::AbstractDouble{T}) = x.hi
+convert{T1<:AbstractFloat, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
+  convert(T1, x.hi) + (precision(T1) >= precision(T2) ? convert(T1, x.lo) : 0)
+
+## Disambiguation in convert Double to Double
+function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double)
+  if typeof(x) == T
+    Double{T}(x,zero(T))
+  else
+    if precision(x.hi) > 2*precision(T)
+      Double{T}(x.hi)
+    else
+      normalize_double(T(x.hi), T(x.lo))
+    end
+  end
+end
 
 ## promotion
 promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{Int64}) = Double{T}
 promote_rule{T<:AbstractFloat}(::Type{Single{T}}, ::Type{Int64}) = Double{T}
 
-promote_rule{T<:AbstractFloat}(::Type{Single{T}}, ::Type{T}) = Single{T}
-promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{T}) = Double{T}
+promote_rule{T1<:AbstractFloat,T2<:AbstractFloat}(::Type{Single{T1}}, ::Type{T2}) = 2*precision(T1) > precision(T2) ? Double{T1} : T2
+promote_rule{T1<:AbstractFloat,T2<:AbstractFloat}(::Type{Double{T1}}, ::Type{T2}) = 2*precision(T1) > precision(T2) ? Double{T1} : T2
 promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{Single{T}}) = Double{T}
 
-promote_rule{s,T<:AbstractFloat}(::Type{Irrational{s}}, ::Type{Single{T}}) = Double{T}
+promote_rule{s,T<:AbstractDouble}(::Type{Irrational{s}}, ::Type{Single{T}}) = Double{T}
+promote_rule{s,T<:AbstractDouble}(::Type{Irrational{s}}, ::Type{Double{T}}) = Double{T}
 
 # We'll assume that AbstractDouble is used for speed and BigFloat for precision
 # The construct Double{BigFloat} should be avoided in favour of selecting
 # higher bigfloat precision.
 promote_rule{T<:AbstractFloat}(::Type{AbstractDouble{T}}, ::Type{BigFloat}) = BigFloat
-
-# Double(::Type{T}, x::Real) converts x to Double{T}, computing both the hi and lo
-# parts. There's no constructor that explicitly puts a zero in the lo.
-# Use Double(x, zero(x)) if Single(x) cannot be used.
-
-Double{T}(::Type{T}, x::Real) = convert(Double{T}, x)
-
-# Macro will do the BigFloat conversion at compile-time.
-@generated function doublesym{T<:AbstractFloat,sym}(::Type{Double{T}}, ::Irrational{sym})
-  Double(T, setprecision(()->BigFloat(eval(sym)),BigFloat,2*precision(T)+32))
-end
-
-convert{T<:AbstractFloat}(::Type{Double{T}}, sym::Irrational) = doublesym(Double{T}, sym)
 
 # Type aliases
 
@@ -164,6 +164,9 @@ typealias Quad{T} Double{Double{T}}
 typealias QuadDouble Quad{Float64}
 typealias Octa{T} Double{Quad{T}}
 typealias OctaDouble Octa{Float64}
+
+typealias SingleSingle{T} Single{Single{T}} # A Quad with .hi.hi as only nonzero
+typealias SingleSingleSingle{T} Single{SingleSingle{T}} # An Octa
 
 # Comparisons
 
@@ -234,13 +237,26 @@ function sqrt{T}(x::AbstractDouble{T})
     Double(c, cc)
 end
 
-rem{T}(x::Double{T},d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
-abs{T}(x::Double{T}) = x.hi>0?x:-x
+# The highest underlying float
+highfloat(x::AbstractFloat) = x
+highfloat(x::AbstractDouble) = highfloat(x.hi)
+
+rem(x::AbstractDouble,d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
+sign(x::AbstractDouble) = sign(x.hi)
+signbit(x::AbstractDouble) = signbit(x.hi)
+for op in [:copysign, :flipsign]
+  @eval $op(x::AbstractFloat,y::AbstractDouble) = $op(x,highfloat(y))
+  @eval $op(x::AbstractDouble,y::AbstractFloat) = Double($op(x.hi,y), $op(x.lo,y))
+  @eval $op(x::AbstractDouble,y::AbstractDouble) = Double($op(x.hi,highfloat(y)), $op(x.lo,highfloat(y)))
+end
 
 include("random.jl")
 
 function show{T}(io::IO, x::AbstractDouble{T})
   print(io, convert(BigFloat,x))
 end
+
+# Not defined in this module, but should work anyway:
+# zero, zeros, one, ones, abs, ...
 
 end #module

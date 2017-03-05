@@ -34,4 +34,7 @@ convert{T<:Number}(::Type{Zerotype}, x::T) = x==zero(T) ? Zerotype() : throw(Ine
 >=(::Zerotype,::Zerotype) = true
 <=(::Zerotype,::Zerotype) = true
 
+copysign(::Zerotype,::Real) = Zerotype()
+flipsign(::Zerotype,::Real) = Zerotype()
+  
 show(io::IO, ::Zerotype) = print(io, "0̸")

@@ -91,7 +91,7 @@ julia> Float64(big(pi) * 0.1)
 ```
 We can also do this computation using `Double`s (note that the promotion rules mean that only one needs to be specified):
 ```julia
-julia> Float64(Double(pi) * 0.1)
+julia> Float64(DoubleDouble(pi) * 0.1)
 0.31415926535897937
 
 julia> Float64(pi * Single(0.1))
