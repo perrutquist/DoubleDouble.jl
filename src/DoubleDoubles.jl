@@ -27,7 +27,12 @@ immutable Double{T<:AbstractFloat} <: AbstractDouble{T}
     lo::T
 end
 
-# A Double with a Zerotype as lo is the definition of a Single.
+function Double(x::Real)
+  warn("Double(x) is depreciated. Use Double{Float64}(x) or DoubleDouble(x) to convert x to Double{Float64}.")
+  convert(Double{Float64}, x)
+end
+
+# A Double with a Zerotype as lo is by definition a Single.
 Double(hi::AbstractFloat, ::Zerotype) = Single(hi)
 
 # "Normalise" Doubles to ensure abs(lo) <= 0.5eps(hi)
