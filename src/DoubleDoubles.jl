@@ -1,6 +1,7 @@
 module DoubleDoubles
 
-export Double, Single, DoubleDouble, QuadDouble, OctaDouble
+export Double, DoubleDouble, QuadDouble, OctaDouble,
+       Single, SingleSingle, SingleSingleSingle
 import Base:
     convert,
     *, +, -, /, sqrt, <, >, <=, >=, ldexp,
@@ -252,7 +253,21 @@ for op in [:copysign, :flipsign]
 end
 abs(x::AbstractDouble) = flipsign(x,x)
 
-include("random.jl")
+"The minimum positive difference between possible rand() return values"
+# NOTE rand(::Float64) in the current implementation always sets the last
+# bit of the significand to zero. Hence eps() and not 0.5*eps()
+rand_eps(::Type{Float64}) = eps(Float64)
+rand_eps(::Type{Float32}) = eps(Float32)
+rand_eps(::Type{Float16}) = eps(Float16)
+rand_eps{T}(::Type{Double{T}}) = rand_eps(T)*rand_eps(T)
+
+"""
+A quick random number function for Double. Does not fill all the bits of the
+significand. (The spacing between possible random numbers is constant eps(2))
+"""
+function rand{T}(::Type{Double{T}})
+    normalize_double(rand(T), rand_eps(T)*rand(T))
+end
 
 function show{T}(io::IO, x::AbstractDouble{T})
   print(io, convert(BigFloat,x))

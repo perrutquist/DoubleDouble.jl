@@ -1,6 +1,7 @@
 using DoubleDoubles
 using Base.Test
 
+include("../src/fullrand.jl")
 
 x = sqrt(2.0)
 bx = big(x)
