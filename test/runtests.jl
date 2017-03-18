@@ -59,14 +59,54 @@ a = Double{Float64}(big"3.1")
 @test Single{Float32}(BigFloat(3)) === Single{Float32}(3.0f0)
 @test Double{Float32}(BigFloat(3)) === Double{Float32}(3.0f0, 0.0f0)
 
+## Utility functions for test routine
+
+testeps(x::AbstractFloat) = eps(x)
+testeps(x::Integer) = one(x)
+
+## Test routine for type interactions
+
+function testtypes(A::Type, B::Type)
+  a = rand(A)
+  println("orig: ", a)
+  if A<:Integer && B<:AbstractFloat && big(abs(a)) >= big(maxintfloat(B))
+    a = mod(a,convert(A,maxintfloat(B)))
+    println("1: ", a)
+  end
+  if A<:AbstractFloat && B<:Integer
+    a = floor(min(maxintfloat(A),typemax(B))*a)
+    println("2: ", a)
+  end
+  epsa = testeps(a)
+  b = convert(B, a)
+  epsb = testeps(b)
+  a2 = convert(A, b)
+  @test abs(big(a)-big(a2)) < 2*max(big(epsa), big(epsb))
+end
 
 ## Test type interactions
 
 intlist = [Int16, Int32, Int64, Int128, UInt16, UInt32, UInt64, UInt128, BigInt]
 floatlist = [Float16, Float32, Float64, BigFloat]
-doublelist = Array(DataType,1)
-for T = floatlist
-  for D = [Single{T}, Single{Single{T}}, Single{Single{Single{T}}}, Single{Double{T}}, Single{Single{Double{T}}}, Single{Double{Double{T}}}, Double{T}, Double{Double{T}}, Double{Double{Double{T}}}]
+singlelist = Array(DataType,0)
+doublelist = Array(DataType,0)
+for T = floatlist[1:end-1]
+  for D = [Single{T}, Single{Single{T}}, Single{Single{Single{T}}},
+          Single{Double{T}}, Single{Single{Double{T}}}, Single{Double{Double{T}}}]
+    push!(singlelist, D)
+  end
+  for D = [Double{T}, Double{Double{T}}, Double{Double{Double{T}}}]
     push!(doublelist, D)
+  end
+end
+
+typelist = [intlist; floatlist; singlelist; doublelist]
+
+for A in typelist
+  for B in typelist
+    if (A <: AbstractDouble) || (B <: AbstractDouble)
+      println(A, " - ", B)
+      testtypes(A,B)
+    end
   end
 end

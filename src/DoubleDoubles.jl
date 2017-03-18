@@ -1,13 +1,13 @@
 module DoubleDoubles
 
-export Double, DoubleDouble, QuadDouble, OctaDouble,
+export AbstractDouble, Double, DoubleDouble, QuadDouble, OctaDouble,
        Single, SingleSingle, SingleSingleSingle
 import Base:
     convert,
     *, +, -, /, sqrt, <, >, <=, >=, ldexp,
     rem, rand, promote_rule, copysign, flipsign, abs,
-    show, big,
-    precision
+    round, floor, ceil, trunc, maxintfloat,
+    show, big, precision, realmin, realmax, exponent, eps
 
 include("Zerotype.jl")
 
@@ -23,25 +23,44 @@ Single(hi::AbstractFloat) = Single(hi,Zerotype())
 "Double{T} uses two instances of type T to represent a floating point number."
 # In a Double, hi uses the full mantissa, and abs(lo) <= 0.5eps(hi)
 # This must be enforced by the method that creates the double.
+# No check at runtime for performance reasons.
 immutable Double{T<:AbstractFloat} <: AbstractDouble{T}
     hi::T
     lo::T
+    function Double(hi,lo)
+      #if !isimmutable(zero(T)) # Should evaluate at compile-time, but doesn't ?
+      #  error("The parts of a Double must be immutable.")
+      #end
+      if T<:BigFloat # Tests at compile-time.
+        error("The parts of a Double must be immutable.")
+      end
+      if T<:Single # Tests at compile-time,
+        error("Creating a Double{Single{...}} makes no sense.")
+      end
+      # TODO: Test if precision is too high, potentially causing underflow in .lo
+      new(hi,lo)
+    end
+    Double(x::Real) = convert(Double{T}, x)
 end
+
+Double{T}(x::T,y::T) = Double{T}(x,y)
 
 function Double(x::Real)
   warn("Double(x) is depreciated. Use Double{Float64}(x) or DoubleDouble(x) to convert x to Double{Float64}.")
-  convert(Double{Float64}, x)
+  Double{Float64}(x)
 end
 
 # A Double with a Zerotype as lo is by definition a Single.
 Double(hi::AbstractFloat, ::Zerotype) = Single(hi)
 
-# "Normalise" Doubles to ensure abs(lo) <= 0.5eps(hi)
+# "Normalize" Doubles to ensure abs(lo) <= 0.5eps(hi)
 # assumes abs(u) > abs(v): if not, use Single + Single
-function normalize_double{T}(u::T, v::T)
-    w = u + v
-    Double(w, (u-w) + v)
+function normalize_double{T<:AbstractFloat}(u::T, v::T)
+  w = u + v
+  Double{T}(w, (u-w) + v)
 end
+
+normalize_double(u::AbstractFloat, ::Zerotype) = Single(u)
 
 # This is a lower bound on the precision. If the binary representation of a
 # number has a lot of zeros in the middle, then higher precision is achieved.
@@ -54,7 +73,7 @@ precision{T}(::Type{Double{T}}) = 2*precision(T)
 precision{T}(::Type{Single{T}}) = 2*precision(T)
 
 # ldexp can be done without renormalization
-ldexp(x::Double, n::Integer) = Double(ldexp(x.hi,n), ldexp(x.lo,n))
+ldexp(x::AbstractDouble, n::Integer) = Double{typeof(x.hi)}(ldexp(x.hi,n), ldexp(x.lo,n))
 
 """
     ldmul(x,poweroftwo)
@@ -104,13 +123,13 @@ convert{T<:AbstractFloat}(::Type{Single{T}}, x::Real) = singleconvert(T, x)
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Rational) = singleconvert(T, x)
 
 ## Conversion to Double
-convert{T<:AbstractFloat}(::Type{Double{T}}, x::T) = Double(x, zero(T))
-convert{T<:AbstractFloat}(::Type{Double{T}}, x::Single{T}) = Double(x.hi, zero(T))
+convert{T<:AbstractFloat}(::Type{Double{T}}, x::T) = Double{T}(x, zero(T))
+convert{T<:AbstractFloat}(::Type{Double{T}}, x::Single{T}) = Double{T}(x.hi, zero(T))
 convert{T<:AbstractFloat}(::Type{Double{T}}, x::Rational) = Double{T}(x.num)/Double{T}(x.den)
 convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double{T}) = x # needed because Double <: AbstractFloat
 function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Real)
   z = convert(T, x)
-  Double(z, convert(T, x-z))
+  Double{T}(z, convert(T, x-z))
 end
 function convert{T<:AbstractFloat}(::Type{BigFloat}, x::AbstractDouble{T})
   setprecision(BigFloat, 2*precision(T)) do
@@ -128,6 +147,9 @@ convert{T<:AbstractFloat}(::Type{Double{T}}, sym::Irrational) = doublesym(Double
 convert{T<:AbstractFloat}(::Type{T}, x::AbstractDouble{T}) = x.hi
 convert{T1<:AbstractFloat, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
   convert(T1, x.hi) + (precision(T1) >= precision(T2) ? convert(T1, x.lo) : 0)
+convert{T1<:Integer, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
+  convert(T1, x.hi) + convert(T1, x.lo)
+
 
 ## Disambiguation in convert Double to Double
 function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double)
@@ -143,8 +165,8 @@ function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double)
 end
 
 ## promotion
-promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{Int64}) = Double{T}
-promote_rule{T<:AbstractFloat}(::Type{Single{T}}, ::Type{Int64}) = Double{T}
+promote_rule{T<:AbstractFloat,T2<:Integer}(::Type{Double{T}}, ::Type{T2}) = Double{T}
+promote_rule{T<:AbstractFloat,T2<:Integer}(::Type{Single{T}}, ::Type{T2}) = Double{T}
 
 promote_rule{T1<:AbstractFloat,T2<:AbstractFloat}(::Type{Single{T1}}, ::Type{T2}) = 2*precision(T1) > precision(T2) ? Double{T1} : T2
 promote_rule{T1<:AbstractFloat,T2<:AbstractFloat}(::Type{Double{T1}}, ::Type{T2}) = 2*precision(T1) > precision(T2) ? Double{T1} : T2
@@ -153,9 +175,6 @@ promote_rule{T<:AbstractFloat}(::Type{Double{T}}, ::Type{Single{T}}) = Double{T}
 promote_rule{s,T<:AbstractDouble}(::Type{Irrational{s}}, ::Type{Single{T}}) = Double{T}
 promote_rule{s,T<:AbstractDouble}(::Type{Irrational{s}}, ::Type{Double{T}}) = Double{T}
 
-# We'll assume that AbstractDouble is used for speed and BigFloat for precision
-# The construct Double{BigFloat} should be avoided in favour of selecting
-# higher bigfloat precision.
 promote_rule{T<:AbstractFloat}(::Type{AbstractDouble{T}}, ::Type{BigFloat}) = BigFloat
 
 # Type aliases
@@ -177,6 +196,10 @@ end
 for op in [:<=,:>=]
   @eval $op{T}(x::AbstractDouble{T},y::AbstractDouble{T})=$op(x.hi,y.hi)?$op(x.lo,y.lo):false
 end
+
+# =={T}(x::AbstractDouble{T},y::AbstractDouble{T}) = (x.hi==y.hi && x.lo==y.lo) # segfault!
+# hash(x::Single, h::UInt) = hash(hash(x.hi),h);
+# hash(x::Double, h::UInt) = hash(hash(x.hi),hash(x.lo,h));
 
 # TODO eliminate branches
 # add12
@@ -235,15 +258,21 @@ function sqrt{T}(x::AbstractDouble{T})
     c = sqrt(x.hi)
     u = Single(c)*Single(c)
     cc = (((x.hi - u.hi) - u.lo) + x.lo)*convert(T,0.5)/c
-    Double(c, cc)
+    Double{T}(c, cc)
 end
 
 # The highest underlying float
 highfloat(x::AbstractFloat) = x
 highfloat(x::AbstractDouble) = highfloat(x.hi)
 
-rem(x::AbstractDouble,d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
+# The below gives infinite recursion if d is Double
+#rem(x::AbstractDouble,d::Real) = normalize_double(rem(x.hi,d), rem(x.lo,d))
+
 signbit(x::AbstractDouble) = signbit(x.hi)
+
+for op in [:round, :floor, :ceil, :trunc]
+  @eval $op(x::AbstractDouble) = abs(x.lo) >= 1 ? Double(x.hi, $op(x.lo)) : Double($op(x.hi),zero(x.lo))
+end
 
 # TODO: Test if the below is really better than the default impelentation
 for op in [:copysign, :flipsign]
@@ -253,24 +282,47 @@ for op in [:copysign, :flipsign]
 end
 abs(x::AbstractDouble) = flipsign(x,x)
 
+realmin{T<:AbstractFloat}(::Type{Single{T}}) = Single{T}(ldexp(realmin(T),precision(T)))
+realmin{T<:AbstractFloat}(::Type{Double{T}}) = Double{T}(ldexp(realmin(T),precision(T)))
+
+exponent(x::AbstractDouble) = exponent(x.hi)
+
+baseof{T<:AbstractFloat}(::Type{Single{T}}) = T
+baseof{T<:AbstractFloat}(::Type{Double{T}}) = T
+baseof{T<:AbstractDouble}(::Type{Single{T}}) = baseof(T)
+baseof{T<:AbstractDouble}(::Type{Double{T}}) = baseof(T)
+
+realmax{T<:AbstractDouble}(::Type{T}) = realmax(baseof(T))
+
+maxintfloat{T<:AbstractFloat}(::Type{Single{T}}) = Single(maxintfloat(T))
+maxintfloat{T<:AbstractFloat}(::Type{Double{T}}) = Double{T}(ldexp(1.0,precision(Double{T})))
+
+eps{T}(::Type{Single{T}}) = eps(T)*eps(T)
+eps{T}(::Type{Double{T}}) = eps(T)*eps(T)
+
+function eps(x::AbstractDouble)
+  h = highfloat(x);
+  if h==0
+    return 1e-200 #TODO!
+  else
+   return convert(typeof(x), ldexp(one(baseof(typeof(x))), exponent(x))*highfloat(eps(typeof(x))))
+ end
+end
+
 "The minimum positive difference between possible rand() return values"
 # NOTE rand(::Float64) in the current implementation always sets the last
 # bit of the significand to zero. Hence eps() and not 0.5*eps()
 rand_eps(::Type{Float64}) = eps(Float64)
 rand_eps(::Type{Float32}) = eps(Float32)
 rand_eps(::Type{Float16}) = eps(Float16)
-rand_eps{T}(::Type{Double{T}}) = rand_eps(T)*rand_eps(T)
+rand_eps{T}(::Type{Double{T}}) = 2*rand_eps(T)*rand_eps(T)
 
-"""
-A quick random number function for Double. Does not fill all the bits of the
-significand. (The spacing between possible random numbers is constant eps(2))
-"""
-function rand{T}(::Type{Double{T}})
-    normalize_double(rand(T), rand_eps(T)*rand(T))
+function rand{T}(rng::MersenneTwister, ::Type{Double{T}})
+    normalize_double(rand(rng, T), rand_eps(T)*2*(rand(rng, T)-0.5))
 end
 
-function show{T}(io::IO, x::AbstractDouble{T})
-  print(io, convert(BigFloat,x))
+function show{T<:AbstractFloat}(io::IO, x::AbstractDouble{T})
+  show(io, convert(BigFloat,x))
 end
 
 # Not defined in this module, but should work anyway:

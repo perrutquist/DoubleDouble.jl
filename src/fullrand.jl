@@ -50,9 +50,6 @@ function fullrand(::Type{BigFloat})
   return r
 end
 
-"fullrand() for integer types is an alias for rand()"
-fullrand{T<:Integer}(::Type{T}) = rand(T)
-
 # fullrand for BigInt is a misnomer. BigInt has infinite precision,
 # but obviously we cannot generate an infinite number of random bits.
 # The goal here is to generate something that is useful for testing.
@@ -67,6 +64,9 @@ function fullrand(::Type{BigInt})
   end
   return r
 end
+
+"fullrand() defaults to rand()"
+fullrand{T<:Number}(::Type{T}) = rand(T)
 
 "fullrand(T,dims) returns an array of fullrand numbers of type T"
 function fullrand(T::Type, dims::Dims)

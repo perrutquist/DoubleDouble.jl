@@ -9,9 +9,6 @@ This is work in progress. Don't switch from DoubleDouble.jl just yet. A lot of t
 
 The core routines are based on the ideas and algorithms of [Dekker (1971)][dekker1971].
 
-NOTE: Constructs like `Double(pi)` that used to default to `Double{Float64}(pi)` are depreciated.
-Either write out `Double{Float64}` explicitly, or use the type alias `DoubleDouble`.
-
 Interface
 ---------
 The main type is `Double`, with two floating-point fields: `hi`, storing the leading bits, and `lo` storing the remainder. `hi` is stored to full precision and rounded to nearest.  When creating a `Double` directly using the type constructor, the user is responsible for ensuring that `abs(x.lo) <= 0.5 * eps(x.hi)`.
@@ -39,6 +36,13 @@ julia> (xx.hi.hi, xx.hi.lo, xx.lo.hi, xx.lo.lo)
 The other type defined is `Single`, which is a `Double` where the `lo` field is guaranteed to be zero.
 (Attempting a conversion to `Single` will throw an `InexactError` if this is not the case.)
 Operations on `Single` typically return `Double` and will often be faster than the corresponding operations on `Double`.
+
+
+### Note
+Constructs like `Double(pi)` that used to default to `Double{Float64}(pi)` are depreciated.
+Either write out `Double{Float64}` explicitly, or use the type alias `DoubleDouble`.
+
+`Double{BigFloat}` is not allowed. The base type must be immutable. (Use `setprecision` to get higher-precision `BigFloat`s.)
 
 Examples
 ---------
