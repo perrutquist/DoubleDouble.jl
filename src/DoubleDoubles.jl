@@ -115,7 +115,7 @@ convert{T<:AbstractFloat}(::Type{Single{T}}, x::Single{T}) = x # needed because 
 
 function singleconvert{T<:AbstractFloat}(::Type{T}, x::Real)
   z = convert(T,x)
-  z == x || throw(InexactError())
+  convert(typeof(x),z) == x || throw(InexactError())
   Single(z)
 end
 convert{T<:AbstractFloat}(::Type{Single{T}}, x::Real) = singleconvert(T, x)
@@ -129,7 +129,12 @@ convert{T<:AbstractFloat}(::Type{Double{T}}, x::Rational) = Double{T}(x.num)/Dou
 convert{T<:AbstractFloat}(::Type{Double{T}}, x::Double{T}) = x # needed because Double <: AbstractFloat
 function convert{T<:AbstractFloat}(::Type{Double{T}}, x::Real)
   z = convert(T, x)
-  Double{T}(z, convert(T, x-z))
+  y = convert(typeof(x), z)
+  if typeof(x) <: Unsigned && y>x
+    return Double{T}(z, -convert(T, y-x))
+  else
+    return Double{T}(z, convert(T, x-y))
+  end
 end
 function convert{T<:AbstractFloat}(::Type{BigFloat}, x::AbstractDouble{T})
   setprecision(BigFloat, 2*precision(T)) do
@@ -147,8 +152,18 @@ convert{T<:AbstractFloat}(::Type{Double{T}}, sym::Irrational) = doublesym(Double
 convert{T<:AbstractFloat}(::Type{T}, x::AbstractDouble{T}) = x.hi
 convert{T1<:AbstractFloat, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
   convert(T1, x.hi) + (precision(T1) >= precision(T2) ? convert(T1, x.lo) : 0)
-convert{T1<:Integer, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2}) =
-  convert(T1, x.hi) + convert(T1, x.lo)
+
+function convert{T1<:Integer, T2<:AbstractFloat}(::Type{T1}, x::AbstractDouble{T2})
+  # TODO: Check range
+  #if x.hi > convert(baseof(typeof(x)), typemax(T1)) || x.hi < convert(baseof(typeof(x)), typemin(T1))
+  #  throw(InexactError)
+  #end
+  if T1<:Unsigned && x.lo<0
+    return convert(T1, x.hi) - convert(T1, -x.lo)
+  else
+    return convert(T1, x.hi) + convert(T1, x.lo)
+  end
+end
 
 
 ## Disambiguation in convert Double to Double
@@ -295,7 +310,7 @@ baseof{T<:AbstractDouble}(::Type{Double{T}}) = baseof(T)
 realmax{T<:AbstractDouble}(::Type{T}) = realmax(baseof(T))
 
 maxintfloat{T<:AbstractFloat}(::Type{Single{T}}) = Single(maxintfloat(T))
-maxintfloat{T<:AbstractFloat}(::Type{Double{T}}) = Double{T}(ldexp(1.0,precision(Double{T})))
+maxintfloat{T<:AbstractFloat}(::Type{Double{T}}) = Double{T}(min(realmax(T),ldexp(1.0,precision(Double{T}))))
 
 eps{T}(::Type{Single{T}}) = eps(T)*eps(T)
 eps{T}(::Type{Double{T}}) = eps(T)*eps(T)
@@ -303,9 +318,9 @@ eps{T}(::Type{Double{T}}) = eps(T)*eps(T)
 function eps(x::AbstractDouble)
   h = highfloat(x);
   if h==0
-    return 1e-200 #TODO!
+    return convert(typeof(x), eps(zero(baseof(typeof(x)))))
   else
-   return convert(typeof(x), ldexp(one(baseof(typeof(x))), exponent(x))*highfloat(eps(typeof(x))))
+    return convert(typeof(x), ldexp(one(baseof(typeof(x))), exponent(x))*highfloat(eps(typeof(x))))
  end
 end
 
