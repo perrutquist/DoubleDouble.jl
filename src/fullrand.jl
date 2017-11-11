@@ -3,7 +3,7 @@ A slower random function that ensures that all bits of the significand are
 randomly generated.
 
 Any legal floating point number (excluding subnormals) in the range from 0 to
-1-eps() might be returned (drawn from a uniform distribution).
+1-eps(T) might be returned (drawn from a uniform distribution).
 
 The spacing beteeen possible random numbers near x is eps(x).
 
@@ -28,45 +28,15 @@ end
 fullrand(::Type{Float32}) = Float32(fullrand(Float64))
 fullrand(::Type{Float16}) = Float16(fullrand(Float64))
 
-function fullrand{T}(::Type{Double{T}})
+function fullrand(::Type{Double{T}}) where T <: AbstractFloat
   hi = fullrand(T);
   lo = fullrand(T);
-  return Double(hi,eps(hi)*(lo-0.5))
+  return Double(hi,eps(hi)*(lo-1//2))
 end
 
-# Really, fullrand should use all bits, so we should have:
-# fullrand(::Type{Single}) = throw(InexactError())
-# But since we're only using it for testing, it makes sense to have
-# a fullrand() that returns a Single
-fullrand{T}(::Type{Single{T}}) = Single(fullrand(T))
-
-function fullrand(::Type{BigFloat})
-  x = fullrand(Float64)
-  e = exponent(x)
-  r = BigFloat(x)
-  for i=1:Int(ceil((precision(BigFloat)-precision(Float64))/32))
-    r = r + ldexp(Float64(rand(UInt32)),e-32*i)
-  end
-  return r
-end
-
-# fullrand for BigInt is a misnomer. BigInt has infinite precision,
-# but obviously we cannot generate an infinite number of random bits.
-# The goal here is to generate something that is useful for testing.
-"""
-fullrand(BigInt) generates some very large integers, but that will still not
-cause overflow in a Float64.
-"""
-function fullrand(::Type{BigInt})
-  r = BigInt(0)
-  for i=1:8
-    r = r<<64+rand(Int64)
-  end
-  return r
-end
-
-"fullrand() defaults to rand()"
-fullrand{T<:Number}(::Type{T}) = rand(T)
+# Fullrand should use all bits, but for Single we make an exception.
+fullrand(::Type{Single{T}}) where T<:AbstractFloat =
+    Single(fullrand(T))
 
 "fullrand(T,dims) returns an array of fullrand numbers of type T"
 function fullrand(T::Type, dims::Dims)

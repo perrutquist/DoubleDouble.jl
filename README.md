@@ -1,9 +1,11 @@
 DoubleDoubles.jl
 ===============
 
-(The module was renamed `DoubleDoubles` as it provides the type `DoubleDouble`.)
+(This is fork of [DoubleDouble.jl][https://github.com/simonbyrne/DoubleDouble.jl]. It was renamed `DoubleDoubles` as it provides the type `DoubleDouble`.)
 
-This is work in progress. Don't switch from DoubleDouble.jl just yet. A lot of the code is completely untested.
+This is work in progress. A lot of the code is completely untested. If you need
+double-double arithmetic right now, I'd suggest using either the [included][https://github.com/JuliaLang/julia/blob/master/base/twiceprecision.jl] type
+that is included in the `Base` module, or the [HigherPrecision][https://github.com/saschatimme/HigherPrecision.jl] module, which also supports trigonometric functions.
 
 `DoubleDoubles.jl` is a Julia package for performing extended-precision arithmetic using pairs of floating-point numbers. This is commonly known as "double-double" arithmetic, as the most common format is a pair of C-doubles (`Float64` in Julia), although `Double`s will actually work for any floating-point type, including itself. Its aim is to provide accurate results without the overhead of `BigFloat` types.
 
